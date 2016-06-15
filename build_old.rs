@@ -4,41 +4,32 @@ extern crate gcc;
 
 use glob::glob;
 use std::process::Command;
-use std::path::{ Path, PathBuf };
+use std::path::{ PathBuf };
 use std::fs;
 use std::fs::{ File, read_dir };
 use std::ffi::OsString;
 use std::io::Write;
-use std::env;
 
 fn main() {
     let out_dir = std::env::var("OUT_DIR").unwrap();
 
-    let windows = env::var("TARGET").unwrap().contains("windows");
-    let (include_paths, actual_opencv) = if windows {
-        let include_paths = Path::new(env::var("OPENCV_DIR").unwrap().as_str())/*.join("build")*/.join("include");
-        let actual_opencv = include_paths.join("opencv2");
-        //println!("{:?} {:?}", include_paths, actual_opencv);
-        (vec![include_paths], actual_opencv)
-    } else {
-        let opencv = pkg_config::Config::new().find("opencv").unwrap();
-        let mut search_paths = opencv.include_paths.clone();
-        search_paths.push(PathBuf::from("/usr/include"));
-        let search_opencv = search_paths.iter().map( |p| {
-            let mut path = PathBuf::from(p);
-            path.push("opencv2");
-            path
-        }).find( { |path| read_dir(path).is_ok() });
-        let actual_opencv = search_opencv.expect("Could not find opencv2 dir in pkg-config includes");
-        (opencv.include_paths, actual_opencv)
-    };
+    let opencv = pkg_config::Config::new().find("opencv").unwrap();
+    let mut search_paths = opencv.include_paths.clone();
+    search_paths.push(PathBuf::from("/usr/include"));
+    let search_opencv = search_paths.iter().map( |p| {
+        let mut path = PathBuf::from(p);
+        path.push("opencv2");
+        path
+    }).find( { |path| read_dir(path).is_ok() });
+    let actual_opencv = search_opencv
+        .expect("Could not find opencv2 dir in pkg-config includes");
 
     println!("OpenCV lives in {:?}", actual_opencv);
     println!("Generating code in {:?}", out_dir);
 
     let mut gcc = gcc::Config::new();
     gcc.flag("-std=c++0x");
-    for path in include_paths.iter() {
+    for path in opencv.include_paths {
         gcc.include(path);
     }
 
@@ -84,7 +75,7 @@ fn main() {
         cpp.push(module.0);
         cpp.set_extension("cpp");
 
-        if !Command::new(if windows {"python"} else {"python2.7"})
+        if !Command::new("python2.7")
                             .args(&["gen_rust.py", "hdr_parser.py", &*out_dir, module.0])
                             .args(&(module.1.iter().map(|p| {
                                 let mut path = actual_opencv.clone();
@@ -113,47 +104,22 @@ fn main() {
         gcc.file(entry.unwrap());
     }
 
-    if windows {
-        //gcc.cpp(true).include(".").include(&out_dir);
-        //gcc.compile("libocvrs.a");
-        for ref module in &modules {
-            /*let e = Command::new("cmd").current_dir(&out_dir).arg("/C").arg(
-                format!(r"cl /nologo /MD /Z7 /I D:\3rdparty\opencv\build\include /I . /I D:\3rdparty\opencv-rust\target\debug\build\opencv-cc3ca7ceb6764c90\out /FoD:\3rdparty\opencv-rust\target\debug\build\opencv-cc3ca7ceb6764c90\out\core.o /c D:\3rdparty\opencv-rust\target\debug\build\opencv-cc3ca7ceb6764c90\out\core.cpp /D_HAS_EXCEPTIONS=0 /EHsc /link /SAFESEH")
-                /*format!(r"cl /nologo /MD /Z7 /I {} /I . /I {} /Fo{}\{}.o /c {}\{}.cpp /D_HAS_EXCEPTIONS=0 /EHsc /link /SAFESEH", include_paths[0].to_str().unwrap(), out_dir, out_dir, module.0, out_dir, module.0)*/
-                /*Command::new("cl").current_dir(&out_dir).args(&["/nologo", "/MD", "/Z7", "/I", "D:\\3rdparty\\opencv\\build\\include", "/I", ".", "/I", "D:\\3rdparty\\opencv-rust\\target\\debug\\build\\opencv-cc3ca7ceb6764c90\\out", "/FoD:\\3rdparty\\opencv-rust\\target\\debug\\build\\opencv-cc3ca7ceb6764c90\\out\\core.o", "/c", "D:\\3rdparty\\opencv-rust\\target\\debug\\build\\opencv-cc3ca7ceb6764c90\\out\\core.cpp", "/D_HAS_EXCEPTIONS=0", "/EHsc", "/link", "/SAFESEH"]*/).status().unwrap();*/
-            let e = Command::new(format!(r"cmd.exe /C cl /nologo /MD /Z7 /I {} /I . /I {} /Fo{}\{}.o /c {}\{}.cpp /D_HAS_EXCEPTIONS=0 /EHsc /link /SAFESEH", include_paths[0].to_str().unwrap(), out_dir, out_dir, module.0, out_dir, module.0)).current_dir(&out_dir).status().unwrap();
-            assert!(e.success());
-        }
-    } else {
-        gcc.cpp(true).include(".").include(&out_dir).flag("-Wno-c++11-extensions");
-        gcc.compile("libocvrs.a");
-    }
+    gcc.cpp(true).include(".").include(&out_dir)
+        .flag("-Wno-c++11-extensions");
 
-    if windows {
-        for ref module in &modules {
-            let e = Command::new("cmd").current_dir(&out_dir).arg("/C").arg(
-                format!(r"cl {}.consts.cpp opencv_{}2412.lib /I {} /link /LIBPATH:{}",
-                    module.0, module.0, include_paths[0].to_str().unwrap(), Path::new(env::var("OPENCV_DIR").unwrap().as_str()).join(r"x86\vc12\lib").to_str().unwrap())
-            ).status().unwrap();
-            assert!(e.success());
-            let e = Command::new("cmd").current_dir(&out_dir).arg("/C").arg(
-                format!(r".\{}.consts > {}.consts.rs", module.0, module.0)
-            ).status().unwrap();
-            assert!(e.success());
-        }
-    } else {
-        for ref module in &modules {
-            let e = Command::new("sh").current_dir(&out_dir).arg("-c").arg(
-                format!("g++ {}.consts.cpp -o {}.consts `pkg-config --cflags --libs opencv`",
-                    module.0, module.0)
-            ).status().unwrap();
-            assert!(e.success());
-            let e = Command::new("sh").current_dir(&out_dir).arg("-c").arg(
-                format!("./{}.consts > {}.consts.rs", module.0, module.0)
-            ).status().unwrap();
-            assert!(e.success());
-        }
-    };
+    gcc.compile("libocvrs.a");
+
+    for ref module in &modules {
+        let e = Command::new("sh").current_dir(&out_dir).arg("-c").arg(
+            format!("g++ {}.consts.cpp -o {}.consts `pkg-config --cflags --libs opencv`",
+                module.0, module.0)
+        ).status().unwrap();
+        assert!(e.success());
+        let e = Command::new("sh").current_dir(&out_dir).arg("-c").arg(
+            format!("./{}.consts > {}.consts.rs", module.0, module.0)
+        ).status().unwrap();
+        assert!(e.success());
+    }
 
     let mut hub_filename = PathBuf::from(&out_dir);
     hub_filename.push("hub.rs");
