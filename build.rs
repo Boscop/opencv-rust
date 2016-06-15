@@ -114,14 +114,10 @@ fn main() {
     }
 
     if windows {
-        //gcc.cpp(true).include(".").include(&out_dir);
-        //gcc.compile("libocvrs.a");
         for ref module in &modules {
-            /*let e = Command::new("cmd").current_dir(&out_dir).arg("/C").arg(
-                format!(r"cl /nologo /MD /Z7 /I D:\3rdparty\opencv\build\include /I . /I D:\3rdparty\opencv-rust\target\debug\build\opencv-cc3ca7ceb6764c90\out /FoD:\3rdparty\opencv-rust\target\debug\build\opencv-cc3ca7ceb6764c90\out\core.o /c D:\3rdparty\opencv-rust\target\debug\build\opencv-cc3ca7ceb6764c90\out\core.cpp /D_HAS_EXCEPTIONS=0 /EHsc /link /SAFESEH")
-                /*format!(r"cl /nologo /MD /Z7 /I {} /I . /I {} /Fo{}\{}.o /c {}\{}.cpp /D_HAS_EXCEPTIONS=0 /EHsc /link /SAFESEH", include_paths[0].to_str().unwrap(), out_dir, out_dir, module.0, out_dir, module.0)*/
-                /*Command::new("cl").current_dir(&out_dir).args(&["/nologo", "/MD", "/Z7", "/I", "D:\\3rdparty\\opencv\\build\\include", "/I", ".", "/I", "D:\\3rdparty\\opencv-rust\\target\\debug\\build\\opencv-cc3ca7ceb6764c90\\out", "/FoD:\\3rdparty\\opencv-rust\\target\\debug\\build\\opencv-cc3ca7ceb6764c90\\out\\core.o", "/c", "D:\\3rdparty\\opencv-rust\\target\\debug\\build\\opencv-cc3ca7ceb6764c90\\out\\core.cpp", "/D_HAS_EXCEPTIONS=0", "/EHsc", "/link", "/SAFESEH"]*/).status().unwrap();*/
-            let e = Command::new(format!(r"cmd.exe /C cl /nologo /MD /Z7 /I {} /I . /I {} /Fo{}\{}.o /c {}\{}.cpp /D_HAS_EXCEPTIONS=0 /EHsc /link /SAFESEH", include_paths[0].to_str().unwrap(), out_dir, out_dir, module.0, out_dir, module.0)).current_dir(&out_dir).status().unwrap();
+            let c = format!(r"cmd.exe /C cl /nologo /MD /Z7 /I {} /I . /I {} /Fo{}\{}.o /c {}\{}.cpp /D_HAS_EXCEPTIONS=0 /EHsc /link /SAFESEH", include_paths[0].to_str().unwrap(), out_dir, out_dir, module.0, out_dir, module.0);
+            println!("{}", c);
+            let e = Command::new(c)/*.current_dir(&out_dir)*//*.current_dir(".")*/.status().unwrap();
             assert!(e.success());
         }
     } else {
