@@ -115,9 +115,10 @@ fn main() {
 
     if windows {
         for ref module in &modules {
-            let c = format!(r"cmd.exe /C cl /nologo /MD /Z7 /I {} /I . /I {} /Fo{}\{}.o /c {}\{}.cpp /D_HAS_EXCEPTIONS=0 /EHsc /link /SAFESEH", include_paths[0].to_str().unwrap(), out_dir, out_dir, module.0, out_dir, module.0);
+            /*let c = format!(r"cmd.exe /C cl /nologo /MD /Z7 /I {} /I . /I {} /Fo{}\{}.o /c {}\{}.cpp /D_HAS_EXCEPTIONS=0 /EHsc /link /SAFESEH", include_paths[0].to_str().unwrap(), out_dir, out_dir, module.0, out_dir, module.0);
             println!("{}", c);
-            let e = Command::new(c)/*.current_dir(&out_dir)*//*.current_dir(".")*/.status().unwrap();
+            let e = Command::new(c)/*.current_dir(&out_dir)*//*.current_dir(".")*/.status().unwrap();*/
+            let e = Command::new("cl").args(&["/nologo", "/MD", "/Z7", "/I", include_paths[0].to_str().unwrap(), "/I", ".", "/I", out_dir.as_str(), format!(r"/Fo{}\{}.o", out_dir, module.0).as_str(), "/c", format!(r"{}\{}.cpp", out_dir, module.0).as_str(), "/D_HAS_EXCEPTIONS=0", "/EHsc", "/link", "/SAFESEH"]).status().unwrap();
             assert!(e.success());
         }
     } else {
